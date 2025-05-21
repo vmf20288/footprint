@@ -44,12 +44,18 @@ namespace NinjaTrader.NinjaScript.Indicators
         private SharpDX.Direct2D1.SolidColorBrush brushGeneral;
         private SharpDX.Direct2D1.SolidColorBrush brushImbalance;
         private TextFormat textFormat;
+        private TextFormat textFormatLarge;
 
         private float offsetXBid = 10f;
         private float offsetXAsk = 50f;
         private float offsetY = 0f;
 
         private bool lastBackgroundWhite;
+
+        // Totales por barra
+        private List<double> barDelta;
+        private List<double> barVolume;
+        private List<double> barCumDelta;
 
         // --------- PROPIEDAD ZONAS IMBALANCE ----------
         private List<ImbalanceZone> imbalanceZones;
@@ -95,11 +101,15 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 barPriceData = new Dictionary<int, SortedDictionary<double, PriceVolume>>();
                 imbalanceZones = new List<ImbalanceZone>();
+                barDelta = new List<double>();
+                barVolume = new List<double>();
+                barCumDelta = new List<double>();
             }
             else if (State == State.DataLoaded)
             {
                 BuildBrushes();
                 textFormat = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", FontSizeProp);
+                textFormatLarge = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", FontSizeProp * 3);
                 lastBackgroundWhite = BackgroundWhite;
             }
             else if (State == State.Terminated)
@@ -113,6 +123,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             brushGeneral?.Dispose();
             brushImbalance?.Dispose();
             textFormat?.Dispose();
+            textFormatLarge?.Dispose();
         }
 
         private void BuildBrushes()
@@ -176,12 +187,31 @@ namespace NinjaTrader.NinjaScript.Indicators
             foreach (var zone in imbalanceZones)
             {
                 if (!zone.Active) continue;
-                // Supply: si el cierre supera el límite superior, se desactiva la zona
-                if (zone.Direction == "supply" && Close[0] > zone.PriceHigh)
+                // Deactivate supply once price moves four ticks above the zone
+                if (zone.Direction == "supply" && Close[0] > zone.PriceHigh + TickSize * 4)
                     zone.Active = false;
-                // Demand: si el cierre cae por debajo del límite inferior, se desactiva la zona
-                if (zone.Direction == "demand" && Close[0] < zone.PriceLow)
+                // Deactivate demand once price drops four ticks below the zone
+                if (zone.Direction == "demand" && Close[0] < zone.PriceLow - TickSize * 4)
                     zone.Active = false;
+            }
+
+            if (CurrentBar >= 1 && CurrentBar > barDelta.Count)
+            {
+                int barIdx = CurrentBar - 1;
+                double d = 0.0, v = 0.0;
+                if (barPriceData.ContainsKey(barIdx))
+                {
+                    foreach (var pv in barPriceData[barIdx].Values)
+                    {
+                        d += pv.AskVolume - pv.BidVolume;
+                        v += pv.AskVolume + pv.BidVolume;
+                    }
+                }
+
+                double prev = barIdx > 0 ? barCumDelta[barIdx - 1] : 0.0;
+                barDelta.Add(d);
+                barVolume.Add(v);
+                barCumDelta.Add(prev + d);
             }
         }
 
@@ -202,12 +232,13 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (Math.Abs(textFormat.FontSize - FontSizeProp) > 0.1f)
             {
                 textFormat.Dispose();
+                textFormatLarge.Dispose();
                 textFormat = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", FontSizeProp);
+                textFormatLarge = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", FontSizeProp * 3);
             }
 
             int firstBar = ChartBars.FromIndex;
-            int lastBar = ChartBars.ToIndex;
-            float barWidth = (float)chartControl.GetBarPaintWidth(ChartBars);
+            int lastBar = Math.Min(ChartBars.ToIndex, CurrentBar);
 
             // -------- DIBUJAR RECTÁNGULOS DE ZONAS ACTIVAS --------------
             foreach (var zone in imbalanceZones)
@@ -223,7 +254,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
                 Color4 rectColor = zone.Direction == "supply"
                     ? new Color4(0.9f, 0.23f, 0.23f, 0.23f)   // rojo suave supply
-                    : new Color4(0.2f, 0.7f, 1.0f, 0.17f);    // azul suave demand
+                    : new Color4(0.2f, 0.9f, 0.2f, 0.17f);    // verde transparente demand
 
                 using (var fillBrush = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, rectColor))
                     RenderTarget.FillRectangle(rect, fillBrush);
@@ -291,7 +322,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 List<(int start, int end)> askStacks = FindStacks(askImbIdx, StackImbalance);
 
                 // --------- REGISTRA ZONAS NUEVAS SI NO EXISTEN YA EN EL BAR ----------
-                // Bid stack (zona de demand, azul)
+                // Bid stack (zona de demand, verde)
                 foreach (var stack in bidStacks)
                 {
                     // Usa priceLevels para convertir idx a precio
@@ -299,7 +330,8 @@ namespace NinjaTrader.NinjaScript.Indicators
                     double priceLow = priceLevels[stack.end];
 
                     // Evita duplicar zonas para mismo rango en el mismo bar
-                    if (!imbalanceZones.Any(z => z.BarNumber == i && z.PriceHigh == priceHigh && z.PriceLow == priceLow && z.Direction == "demand"))
+                    if (!imbalanceZones.Any(z => z.BarNumber == i && z.PriceHigh == priceHigh && z.PriceLow == priceLow && z.Direction == "demand")
+                        && Bars.GetClose(i) >= priceLow - TickSize * 4)
                     {
                         imbalanceZones.Add(new ImbalanceZone
                         {
@@ -318,7 +350,8 @@ namespace NinjaTrader.NinjaScript.Indicators
                     double priceHigh = priceLevels[stack.start];
                     double priceLow = priceLevels[stack.end];
 
-                    if (!imbalanceZones.Any(z => z.BarNumber == i && z.PriceHigh == priceHigh && z.PriceLow == priceLow && z.Direction == "supply"))
+                    if (!imbalanceZones.Any(z => z.BarNumber == i && z.PriceHigh == priceHigh && z.PriceLow == priceLow && z.Direction == "supply")
+                        && Bars.GetClose(i) <= priceHigh + TickSize * 4)
                     {
                         imbalanceZones.Add(new ImbalanceZone
                         {
@@ -356,6 +389,51 @@ namespace NinjaTrader.NinjaScript.Indicators
                             RenderTarget.DrawTextLayout(new Vector2(xAsk, yPos), layoutA, colorBrush);
                     }
                 }
+
+                // ----- Delta, Cumulative Delta y Volumen para la barra -----
+                double dBar = 0.0, vBar = 0.0;
+                foreach (var pvSum in levels.Values)
+                {
+                    dBar += pvSum.AskVolume - pvSum.BidVolume;
+                    vBar += pvSum.AskVolume + pvSum.BidVolume;
+                }
+
+                double cBar = i < barCumDelta.Count
+                    ? barCumDelta[i]
+                    : ((i > 0 && i - 1 < barCumDelta.Count ? barCumDelta[i - 1] : 0.0) + dBar);
+
+                float rowH = textFormatLarge.FontSize + 2f;
+                float baseY = ChartPanel.Y + ChartPanel.H - rowH * 3f - 4f;
+
+                // Fondo dinámico para Delta
+                float intensity = Math.Min(1f, (float)Math.Abs(dBar) / 1000f);
+                var deltaColor = dBar >= 0 ? new Color4(0f, 1f, 0f, 0.5f + 0.5f * intensity)
+                                           : new Color4(1f, 0f, 0f, 0.5f + 0.5f * intensity);
+
+                float cellW = 60f;
+                var rectDelta = new RectangleF(xCenter - cellW / 2, baseY, cellW, rowH);
+                using (var bg = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, deltaColor))
+                    RenderTarget.FillRectangle(rectDelta, bg);
+                using (var border = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, deltaColor))
+                    RenderTarget.DrawRectangle(rectDelta, border, 1f);
+
+                string sDelta = dBar.ToString("0");
+                using (var tlDelta = new TextLayout(Core.Globals.DirectWriteFactory, sDelta, textFormatLarge, cellW, rowH))
+                    RenderTarget.DrawTextLayout(new Vector2(rectDelta.X, rectDelta.Y), tlDelta, brushGeneral);
+
+                var rectCum = new RectangleF(xCenter - cellW / 2, baseY + rowH, cellW, rowH);
+                using (var border2 = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, brushGeneral.Color))
+                    RenderTarget.DrawRectangle(rectCum, border2, 1f);
+                string sCum = cBar.ToString("0");
+                using (var tlCum = new TextLayout(Core.Globals.DirectWriteFactory, sCum, textFormatLarge, cellW, rowH))
+                    RenderTarget.DrawTextLayout(new Vector2(rectCum.X, rectCum.Y), tlCum, brushGeneral);
+
+                var rectVol = new RectangleF(xCenter - cellW / 2, baseY + rowH * 2, cellW, rowH);
+                using (var border3 = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, brushGeneral.Color))
+                    RenderTarget.DrawRectangle(rectVol, border3, 1f);
+                string sVol = vBar.ToString("0");
+                using (var tlVol = new TextLayout(Core.Globals.DirectWriteFactory, sVol, textFormatLarge, cellW, rowH))
+                    RenderTarget.DrawTextLayout(new Vector2(rectVol.X, rectVol.Y), tlVol, brushGeneral);
             }
         }
 
