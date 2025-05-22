@@ -223,55 +223,56 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
-    public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
-    {
-        private a6[] cachea6;
-        public a6 a6(int fontSizeProp, bool backgroundWhite)
-        {
-            return a6(Input, fontSizeProp, backgroundWhite);
-        }
+	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+	{
+		private a6[] cachea6;
+		public a6 a6(int fontSizeProp, bool backgroundWhite)
+		{
+			return a6(Input, fontSizeProp, backgroundWhite);
+		}
 
-        public a6 a6(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
-        {
-            if (cachea6 != null)
-                for (int idx = 0; idx < cachea6.Length; idx++)
-                    if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].BackgroundWhite == backgroundWhite && cachea6[idx].EqualsInput(input))
-                        return cachea6[idx];
-            return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea6);
-        }
-    }
+		public a6 a6(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
+		{
+			if (cachea6 != null)
+				for (int idx = 0; idx < cachea6.Length; idx++)
+					if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].BackgroundWhite == backgroundWhite && cachea6[idx].EqualsInput(input))
+						return cachea6[idx];
+			return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea6);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
-    public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
-    {
-        public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(Input, fontSizeProp, backgroundWhite);
-        }
+	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+	{
+		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(Input, fontSizeProp, backgroundWhite);
+		}
 
-        public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(input, fontSizeProp, backgroundWhite);
-        }
-    }
+		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(input, fontSizeProp, backgroundWhite);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
-    {
-        public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(Input, fontSizeProp, backgroundWhite);
-        }
+	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+	{
+		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(Input, fontSizeProp, backgroundWhite);
+		}
 
-        public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(input, fontSizeProp, backgroundWhite);
-        }
-    }
+		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(input, fontSizeProp, backgroundWhite);
+		}
+	}
 }
 
 #endregion
+
