@@ -11,18 +11,14 @@ using SharpDX.DirectWrite;
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
-    // Simple delta comparison indicator with three calculation methods
+    // Delta indicator using tick rule and volume
     public class a6 : Indicator
     {
         // --- fields ---------------------------------------------------------
-        private double bestBid = 0.0;
-        private double bestAsk = double.MaxValue;
         private double lastTradePrice = 0.0;
         private int lastDirection = 0;
 
-        private Dictionary<int, double> delta1;  // bid/ask classification
         private Dictionary<int, double> delta2;  // tick rule
-        private Dictionary<int, double> delta3;  // midpoint rule
         private Dictionary<int, double> volume;
 
         private SharpDX.Direct2D1.SolidColorBrush brushGeneral;
@@ -48,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (State == State.SetDefaults)
             {
                 Name                    = "a6";
-                Description             = "Delta comparison – three methods";
+                Description             = "Delta (tick rule) and volume";
                 Calculate               = Calculate.OnEachTick;
                 IsOverlay               = true;
                 DisplayInDataBox        = false;
@@ -62,9 +58,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Configure)
             {
-                delta1 = new Dictionary<int, double>();
                 delta2 = new Dictionary<int, double>();
-                delta3 = new Dictionary<int, double>();
                 volume = new Dictionary<int, double>();
             }
             else if (State == State.DataLoaded)
@@ -103,15 +97,6 @@ namespace NinjaTrader.NinjaScript.Indicators
         }
 
         // --- market data ----------------------------------------------------
-        protected override void OnMarketDepth(MarketDepthEventArgs e)
-        {
-            if (e.Position != 0) return;
-            if (e.MarketDataType == MarketDataType.Bid)
-                bestBid = e.Price;
-            else if (e.MarketDataType == MarketDataType.Ask)
-                bestAsk = e.Price;
-        }
-
         protected override void OnMarketData(MarketDataEventArgs e)
         {
             if (BarsInProgress != 0 || e.MarketDataType != MarketDataType.Last)
@@ -121,16 +106,10 @@ namespace NinjaTrader.NinjaScript.Indicators
             double price = e.Price;
             double vol   = e.Volume;
 
-            if (!delta1.ContainsKey(barIdx))
+            if (!delta2.ContainsKey(barIdx))
             {
-                delta1[barIdx] = delta2[barIdx] = delta3[barIdx] = volume[barIdx] = 0.0;
+                delta2[barIdx] = volume[barIdx] = 0.0;
             }
-
-            // Method 1: classification using current best bid/ask
-            if (price >= bestAsk)
-                delta1[barIdx] += vol;
-            else if (price <= bestBid)
-                delta1[barIdx] -= vol;
 
             // Method 2: tick rule
             double sign2;
@@ -144,10 +123,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (sign2 != 0)
                 lastDirection = sign2 > 0 ? 1 : -1;
             lastTradePrice = price;
-
-            // Method 3: midpoint between bid/ask
-            double mid = (bestBid + bestAsk) / 2.0;
-            delta3[barIdx] += vol * (price >= mid ? 1 : -1);
 
             volume[barIdx] += vol;
         }
@@ -177,19 +152,15 @@ namespace NinjaTrader.NinjaScript.Indicators
             float barWidth = (float)chartControl.GetBarPaintWidth(ChartBars);
 
             float yBottom = (float)chartScale.GetYByValue(chartScale.MinValue);
-            const int rowCount = 4; // three deltas + volume
+            const int rowCount = 2; // delta + volume
             float yTop    = yBottom - bottomMargin - rectHeight * rowCount;
 
-            double max1 = 0.0, max2 = 0.0, max3 = 0.0;
+            double max2 = 0.0;
             for (int i = firstBar; i <= lastBar; i++)
             {
-                if (delta1.ContainsKey(i)) max1 = Math.Max(max1, Math.Abs(delta1[i]));
                 if (delta2.ContainsKey(i)) max2 = Math.Max(max2, Math.Abs(delta2[i]));
-                if (delta3.ContainsKey(i)) max3 = Math.Max(max3, Math.Abs(delta3[i]));
             }
-            if (max1.Equals(0.0)) max1 = 1.0;
             if (max2.Equals(0.0)) max2 = 1.0;
-            if (max3.Equals(0.0)) max3 = 1.0;
 
             int deltaFontSize = FontSizeProp + 8;
             using (var deltaFormat = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", deltaFontSize))
@@ -199,10 +170,8 @@ namespace NinjaTrader.NinjaScript.Indicators
                     float xCenter = chartControl.GetXByBarIndex(ChartBars, i);
                     float xLeft   = xCenter - barWidth / 2f;
 
-                    DrawCell(delta1, i, max1, xLeft, yTop,                 barWidth, rectHeight, deltaFormat, brushGeneral);
-                    DrawCell(delta2, i, max2, xLeft, yTop + rectHeight,    barWidth, rectHeight, deltaFormat, brushGeneral);
-                    DrawCell(delta3, i, max3, xLeft, yTop + rectHeight * 2, barWidth, rectHeight, deltaFormat, brushGeneral);
-                    DrawVolumeCell(i, xLeft, yTop + rectHeight * 3,         barWidth, rectHeight, deltaFormat);
+                    DrawCell(delta2, i, max2, xLeft, yTop,             barWidth, rectHeight, deltaFormat, brushGeneral);
+                    DrawVolumeCell(i, xLeft, yTop + rectHeight,     barWidth, rectHeight, deltaFormat);
                 }
             }
         }
@@ -254,55 +223,56 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
-    public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
-    {
-        private a6[] cachea6;
-        public a6 a6(int fontSizeProp, bool backgroundWhite)
-        {
-            return a6(Input, fontSizeProp, backgroundWhite);
-        }
+	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+	{
+		private a6[] cachea6;
+		public a6 a6(int fontSizeProp, bool backgroundWhite)
+		{
+			return a6(Input, fontSizeProp, backgroundWhite);
+		}
 
-        public a6 a6(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
-        {
-            if (cachea6 != null)
-                for (int idx = 0; idx < cachea6.Length; idx++)
-                    if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].BackgroundWhite == backgroundWhite && cachea6[idx].EqualsInput(input))
-                        return cachea6[idx];
-            return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea6);
-        }
-    }
+		public a6 a6(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
+		{
+			if (cachea6 != null)
+				for (int idx = 0; idx < cachea6.Length; idx++)
+					if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].BackgroundWhite == backgroundWhite && cachea6[idx].EqualsInput(input))
+						return cachea6[idx];
+			return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea6);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
-    public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
-    {
-        public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(Input, fontSizeProp, backgroundWhite);
-        }
+	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+	{
+		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(Input, fontSizeProp, backgroundWhite);
+		}
 
-        public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(input, fontSizeProp, backgroundWhite);
-        }
-    }
+		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(input, fontSizeProp, backgroundWhite);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
-    {
-        public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(Input, fontSizeProp, backgroundWhite);
-        }
+	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+	{
+		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(Input, fontSizeProp, backgroundWhite);
+		}
 
-        public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-        {
-            return indicator.a6(input, fontSizeProp, backgroundWhite);
-        }
-    }
+		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
+		{
+			return indicator.a6(input, fontSizeProp, backgroundWhite);
+		}
+	}
 }
 
 #endregion
+
