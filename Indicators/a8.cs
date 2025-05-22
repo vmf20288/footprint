@@ -8,11 +8,12 @@ using NinjaTrader.Gui.Chart;
 using NinjaTrader.NinjaScript;
 using SharpDX;
 using SharpDX.DirectWrite;
+using System.Windows.Media;                 // Brushes
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
     // Delta indicator using tick rule and volume
-    public class a6 : Indicator
+    public class a8 : Indicator
     {
         // --- fields ---------------------------------------------------------
         private double lastTradePrice = 0.0;
@@ -29,6 +30,22 @@ namespace NinjaTrader.NinjaScript.Indicators
         private float rectHeight = 30f;
         private float bottomMargin = 50f;
 
+        // ----- absorption fields -------------------------------------------
+        private class VolBucket { public double BidVol; public double AskVol; }
+        private SortedDictionary<double, VolBucket> priceMap;
+        private Queue<double> baselineBuffer;
+        private double baseline;
+        private double lastBid = double.NaN;
+        private double lastAsk = double.NaN;
+        private double lastPrice = double.NaN;
+        private bool   pendingPotential;
+        private OrderDir pendingDir;
+        private double pendingPrice;
+        private double tickSize;
+
+        private enum AbsState { Potential, Confirmed }
+        private enum OrderDir { Long, Short }
+
         // --- properties -----------------------------------------------------
         [NinjaScriptProperty]
         [Display(Name = "Font Size", Order = 0, GroupName = "Parameters")]
@@ -38,13 +55,33 @@ namespace NinjaTrader.NinjaScript.Indicators
         [Display(Name = "Background White", Order = 1, GroupName = "Parameters")]
         public bool BackgroundWhite { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Absorption M", Order = 2, GroupName = "Absorption")]
+        public int AbsorptionM { get; set; } = 24;
+
+        [NinjaScriptProperty]
+        [Display(Name = "Absorption K", Order = 3, GroupName = "Absorption")]
+        public double AbsorptionK { get; set; } = 3.0;
+
+        [NinjaScriptProperty]
+        [Display(Name = "Usar Confirmacion Delta Footprint", Order = 4, GroupName = "Absorption")]
+        public bool UsarConfirmacionDeltaFootprint { get; set; } = true;
+
+        [NinjaScriptProperty]
+        [Display(Name = "Cluster Span Ticks", Order = 5, GroupName = "Absorption")]
+        public int ClusterSpanTicks { get; set; } = 2;
+
+        [NinjaScriptProperty]
+        [Display(Name = "Color Potencial", Order = 6, GroupName = "Absorption")]
+        public Brush ColorPotencial { get; set; } = Brushes.Gray;
+
         // --- state machine --------------------------------------------------
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name                    = "a6";
-                Description             = "Delta (tick rule) and volume";
+                Name                    = "a8";
+                Description             = "Delta (tick rule) + volume + Absorption";
                 Calculate               = Calculate.OnEachTick;
                 IsOverlay               = true;
                 DisplayInDataBox        = false;
@@ -58,8 +95,19 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Configure)
             {
-                delta2 = new Dictionary<int, double>();
-                volume = new Dictionary<int, double>();
+                if (!Bars.IsTickReplay)
+                    throw new Exception("a8 requiere Tick Replay activado.");
+
+                if (ClusterSpanTicks < 1) ClusterSpanTicks = 1;
+                if (AbsorptionM < 2) AbsorptionM = 2;
+                if (AbsorptionK <= 1) AbsorptionK = 2;
+
+                delta2        = new Dictionary<int, double>();
+                volume        = new Dictionary<int, double>();
+                priceMap      = new SortedDictionary<double, VolBucket>();
+                baselineBuffer= new Queue<double>();
+                baseline      = 0.0;
+                tickSize      = Bars.Instrument.MasterInstrument.TickSize;
             }
             else if (State == State.DataLoaded)
             {
@@ -99,7 +147,21 @@ namespace NinjaTrader.NinjaScript.Indicators
         // --- market data ----------------------------------------------------
         protected override void OnMarketData(MarketDataEventArgs e)
         {
-            if (BarsInProgress != 0 || e.MarketDataType != MarketDataType.Last)
+            if (BarsInProgress != 0)
+                return;
+
+            if (e.MarketDataType == MarketDataType.Bid)
+            {
+                lastBid = e.Price;
+                return;
+            }
+            if (e.MarketDataType == MarketDataType.Ask)
+            {
+                lastAsk = e.Price;
+                return;
+            }
+
+            if (e.MarketDataType != MarketDataType.Last)
                 return;
 
             int barIdx   = CurrentBar;
@@ -111,7 +173,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 delta2[barIdx] = volume[barIdx] = 0.0;
             }
 
-            // Method 2: tick rule
+            // Method 2: tick rule for delta
             double sign2;
             if (price > lastTradePrice)
                 sign2 = 1;
@@ -125,6 +187,50 @@ namespace NinjaTrader.NinjaScript.Indicators
             lastTradePrice = price;
 
             volume[barIdx] += vol;
+
+            // Determine aggressor using bid/ask when available, fallback tick rule
+            bool isBuy;
+            if (!double.IsNaN(lastAsk) && price >= lastAsk)
+                isBuy = true;
+            else if (!double.IsNaN(lastBid) && price <= lastBid)
+                isBuy = false;
+            else if (!double.IsNaN(lastPrice))
+                isBuy = price > lastPrice;
+            else
+                isBuy = true;
+            lastPrice = price;
+
+            if (!priceMap.TryGetValue(price, out var bucket))
+                bucket = new VolBucket();
+            if (isBuy) bucket.AskVol += vol; else bucket.BidVol += vol;
+            priceMap[price] = bucket;
+
+            double lowBound  = Low[0] - 2 * tickSize;
+            double highBound = High[0] + 2 * tickSize;
+            foreach (var key in new List<double>(priceMap.Keys))
+                if (key < lowBound || key > highBound)
+                    priceMap.Remove(key);
+
+            DetectAbsorption(price);
+        }
+
+        protected override void OnBarUpdate()
+        {
+            double fpVol = 0.0;
+            foreach (var pv in priceMap.Values)
+                fpVol += pv.BidVol + pv.AskVol;
+
+            baselineBuffer.Enqueue(fpVol);
+            while (baselineBuffer.Count > AbsorptionM)
+                baselineBuffer.Dequeue();
+
+            double sum = 0.0;
+            foreach (var v in baselineBuffer) sum += v;
+            if (baselineBuffer.Count > 0) baseline = sum / baselineBuffer.Count;
+
+            priceMap.Clear();
+            lastBid = lastAsk = lastPrice = double.NaN;
+            pendingPotential = false;
         }
 
         // --- render ---------------------------------------------------------
@@ -216,6 +322,61 @@ namespace NinjaTrader.NinjaScript.Indicators
                 RenderTarget.DrawTextLayout(new Vector2(tx, ty), layout, brushVolumeWhite);
             }
         }
+
+        private void DetectAbsorption(double price)
+        {
+            double clusterBid = 0.0, clusterAsk = 0.0;
+            foreach (var kv in priceMap)
+            {
+                if (Math.Abs(kv.Key - price) <= ClusterSpanTicks * tickSize)
+                {
+                    clusterBid += kv.Value.BidVol;
+                    clusterAsk += kv.Value.AskVol;
+                }
+            }
+
+            if (clusterBid >= AbsorptionK * baseline && clusterAsk >= AbsorptionK * baseline)
+            {
+                double ratio = clusterAsk / clusterBid;
+                if (ratio >= 0.8 && ratio <= 1.25)
+                {
+                    OrderDir dir = clusterAsk >= clusterBid ? OrderDir.Long : OrderDir.Short;
+                    double curDelta = delta2.ContainsKey(CurrentBar) ? delta2[CurrentBar] : 0.0;
+                    bool deltaOk = (dir == OrderDir.Long && curDelta > 0) || (dir == OrderDir.Short && curDelta < 0);
+                    AbsState st = AbsState.Confirmed;
+
+                    if (UsarConfirmacionDeltaFootprint && !deltaOk)
+                    {
+                        st = AbsState.Potential;
+                        pendingPotential = true;
+                        pendingDir = dir;
+                        pendingPrice = price;
+                    }
+
+                    TriggerAbsorption(st, dir, price);
+                }
+            }
+
+            if (pendingPotential)
+            {
+                double curDelta = delta2.ContainsKey(CurrentBar) ? delta2[CurrentBar] : 0.0;
+                bool deltaOk = (pendingDir == OrderDir.Long && curDelta > 0) || (pendingDir == OrderDir.Short && curDelta < 0);
+                if (deltaOk)
+                {
+                    TriggerAbsorption(AbsState.Confirmed, pendingDir, pendingPrice);
+                    pendingPotential = false;
+                }
+            }
+        }
+
+        private void TriggerAbsorption(AbsState st, OrderDir dir, double price)
+        {
+            string tag = st == AbsState.Confirmed ? $"ABS_C_{CurrentBar}" : $"ABS_P_{CurrentBar}";
+            Brush col = st == AbsState.Potential ? ColorPotencial : (dir == OrderDir.Long ? Brushes.Lime : Brushes.Red);
+            RemoveDrawObject("ABS_P_" + CurrentBar);
+            Draw.Dot(this, tag, false, 0, price, col);
+            Alert(tag, Priority.Medium, $"Absorption {(dir == OrderDir.Long ? "LONG" : "SHORT")} @ {price}", "Alert1.wav", 10, Brushes.White, Brushes.Black);
+        }
     }
 }
 
@@ -225,20 +386,20 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
-		private a6[] cachea6;
-		public a6 a6(int fontSizeProp, bool backgroundWhite)
-		{
-			return a6(Input, fontSizeProp, backgroundWhite);
-		}
+            private a8[] cachea8;
+            public a8 a8(int fontSizeProp, bool backgroundWhite)
+            {
+                    return a8(Input, fontSizeProp, backgroundWhite);
+            }
 
-		public a6 a6(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
-		{
-			if (cachea6 != null)
-				for (int idx = 0; idx < cachea6.Length; idx++)
-					if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].BackgroundWhite == backgroundWhite && cachea6[idx].EqualsInput(input))
-						return cachea6[idx];
-			return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea6);
-		}
+            public a8 a8(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
+            {
+                    if (cachea8 != null)
+                            for (int idx = 0; idx < cachea8.Length; idx++)
+                                    if (cachea8[idx] != null && cachea8[idx].FontSizeProp == fontSizeProp && cachea8[idx].BackgroundWhite == backgroundWhite && cachea8[idx].EqualsInput(input))
+                                            return cachea8[idx];
+                    return CacheIndicator<a8>(new a8(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea8);
+            }
 	}
 }
 
@@ -246,15 +407,15 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(Input, fontSizeProp, backgroundWhite);
-		}
+            public Indicators.a8 a8(int fontSizeProp, bool backgroundWhite)
+            {
+                    return indicator.a8(Input, fontSizeProp, backgroundWhite);
+            }
 
-		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(input, fontSizeProp, backgroundWhite);
-		}
+            public Indicators.a8 a8(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
+            {
+                    return indicator.a8(input, fontSizeProp, backgroundWhite);
+            }
 	}
 }
 
@@ -262,15 +423,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(Input, fontSizeProp, backgroundWhite);
-		}
+            public Indicators.a8 a8(int fontSizeProp, bool backgroundWhite)
+            {
+                    return indicator.a8(Input, fontSizeProp, backgroundWhite);
+            }
 
-		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(input, fontSizeProp, backgroundWhite);
-		}
+            public Indicators.a8 a8(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
+            {
+                    return indicator.a8(input, fontSizeProp, backgroundWhite);
+            }
 	}
 }
 
