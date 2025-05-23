@@ -379,6 +379,7 @@
     <Compile Include="Indicators\a6.cs" />
     <Compile Include="Indicators\a7.cs" />
     <Compile Include="Indicators\a9.cs" />
+    <Compile Include="Indicators\a10.cs" />
     <Compile Include="Indicators\footprint.cs" />
     <Compile Include="Strategies\a10.cs" />
   </ItemGroup>
