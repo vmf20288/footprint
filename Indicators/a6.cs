@@ -22,9 +22,11 @@ namespace NinjaTrader.NinjaScript.Indicators
         private Dictionary<int, double> volume;
 
         private SharpDX.Direct2D1.SolidColorBrush brushGeneral;
-        private SharpDX.Direct2D1.SolidColorBrush brushVolumeWhite;
+        private SharpDX.Direct2D1.SolidColorBrush brushVolume;
         private TextFormat textFormat;
-        private bool lastBackgroundWhite;
+
+        private Series<double> deltaSeries;
+        private Series<double> volumeSeries;
 
         private float rectHeight = 30f;
         private float bottomMargin = 50f;
@@ -34,9 +36,14 @@ namespace NinjaTrader.NinjaScript.Indicators
         [Display(Name = "Font Size", Order = 0, GroupName = "Parameters")]
         public int FontSizeProp { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "Background White", Order = 1, GroupName = "Parameters")]
-        public bool BackgroundWhite { get; set; }
+        [Browsable(false)]
+        [XmlIgnore]
+        public Series<double> DeltaSeries => deltaSeries;
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public Series<double> VolumeSeries => volumeSeries;
+
 
         // --- state machine --------------------------------------------------
         protected override void OnStateChange()
@@ -54,7 +61,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                 PaintPriceMarkers       = false;
 
                 FontSizeProp            = 12;
-                BackgroundWhite         = false;
             }
             else if (State == State.Configure)
             {
@@ -65,7 +71,10 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 BuildBrushes();
                 textFormat = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", FontSizeProp);
-                lastBackgroundWhite = BackgroundWhite;
+                deltaSeries = new Series<double>(this, MaximumBarsLookBack.Infinite);
+                volumeSeries = new Series<double>(this, MaximumBarsLookBack.Infinite);
+                deltaSeries[0] = double.NaN;
+                volumeSeries[0] = double.NaN;
             }
             else if (State == State.Terminated)
             {
@@ -76,23 +85,22 @@ namespace NinjaTrader.NinjaScript.Indicators
         private void DisposeGraphics()
         {
             brushGeneral?.Dispose();
-            brushVolumeWhite?.Dispose();
+            brushVolume?.Dispose();
             textFormat?.Dispose();
         }
 
         private void BuildBrushes()
         {
             brushGeneral?.Dispose();
-            brushVolumeWhite?.Dispose();
+            brushVolume?.Dispose();
 
-            Color4 cText = BackgroundWhite ? new Color4(0, 0, 0, 1f)
-                                           : new Color4(1, 1, 1, 1f);
-            Color4 cVol  = new Color4(1, 1, 1, 1f);
+            Color4 cText = new Color4(0, 0, 0, 1f);
+            Color4 cVol  = new Color4(0, 0, 0, 1f);
 
             if (RenderTarget != null)
             {
-                brushGeneral     = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, cText);
-                brushVolumeWhite = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, cVol);
+                brushGeneral = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, cText);
+                brushVolume  = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, cVol);
             }
         }
 
@@ -127,6 +135,15 @@ namespace NinjaTrader.NinjaScript.Indicators
             volume[barIdx] += vol;
         }
 
+        protected override void OnBarUpdate()
+        {
+            if (CurrentBar < 0)
+                return;
+
+            deltaSeries[0] = delta2.ContainsKey(CurrentBar) ? delta2[CurrentBar] : double.NaN;
+            volumeSeries[0] = volume.ContainsKey(CurrentBar) ? volume[CurrentBar] : double.NaN;
+        }
+
         // --- render ---------------------------------------------------------
         protected override void OnRender(ChartControl chartControl, ChartScale chartScale)
         {
@@ -135,11 +152,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (ChartBars == null || RenderTarget == null)
                 return;
 
-            if (lastBackgroundWhite != BackgroundWhite)
-            {
-                BuildBrushes();
-                lastBackgroundWhite = BackgroundWhite;
-            }
 
             if (Math.Abs(textFormat.FontSize - FontSizeProp) > 0.1f)
             {
@@ -213,7 +225,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 var m = layout.Metrics;
                 float tx = xLeft + (width  - m.Width)  / 2f;
                 float ty = yTop  + (height - m.Height) / 2f;
-                RenderTarget.DrawTextLayout(new Vector2(tx, ty), layout, brushVolumeWhite);
+            RenderTarget.DrawTextLayout(new Vector2(tx, ty), layout, brushVolume);
             }
         }
     }
@@ -225,53 +237,53 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
-		private a6[] cachea6;
-		public a6 a6(int fontSizeProp, bool backgroundWhite)
-		{
-			return a6(Input, fontSizeProp, backgroundWhite);
-		}
+                private a6[] cachea6;
+                public a6 a6(int fontSizeProp)
+                {
+                        return a6(Input, fontSizeProp);
+                }
 
-		public a6 a6(ISeries<double> input, int fontSizeProp, bool backgroundWhite)
-		{
-			if (cachea6 != null)
-				for (int idx = 0; idx < cachea6.Length; idx++)
-					if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].BackgroundWhite == backgroundWhite && cachea6[idx].EqualsInput(input))
-						return cachea6[idx];
-			return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp, BackgroundWhite = backgroundWhite }, input, ref cachea6);
-		}
-	}
+                public a6 a6(ISeries<double> input, int fontSizeProp)
+                {
+                        if (cachea6 != null)
+                                for (int idx = 0; idx < cachea6.Length; idx++)
+                                        if (cachea6[idx] != null && cachea6[idx].FontSizeProp == fontSizeProp && cachea6[idx].EqualsInput(input))
+                                                return cachea6[idx];
+                        return CacheIndicator<a6>(new a6(){ FontSizeProp = fontSizeProp }, input, ref cachea6);
+                }
+        }
 }
 
 namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(Input, fontSizeProp, backgroundWhite);
-		}
+                public Indicators.a6 a6(int fontSizeProp)
+                {
+                        return indicator.a6(Input, fontSizeProp);
+                }
 
-		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(input, fontSizeProp, backgroundWhite);
-		}
-	}
+                public Indicators.a6 a6(ISeries<double> input , int fontSizeProp)
+                {
+                        return indicator.a6(input, fontSizeProp);
+                }
+        }
 }
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.a6 a6(int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(Input, fontSizeProp, backgroundWhite);
-		}
+                public Indicators.a6 a6(int fontSizeProp)
+                {
+                        return indicator.a6(Input, fontSizeProp);
+                }
 
-		public Indicators.a6 a6(ISeries<double> input , int fontSizeProp, bool backgroundWhite)
-		{
-			return indicator.a6(input, fontSizeProp, backgroundWhite);
-		}
-	}
+                public Indicators.a6 a6(ISeries<double> input , int fontSizeProp)
+                {
+                        return indicator.a6(input, fontSizeProp);
+                }
+        }
 }
 
 #endregion
