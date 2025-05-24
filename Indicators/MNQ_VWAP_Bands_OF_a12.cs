@@ -10,12 +10,15 @@
 //  • NO genera órdenes (es Indicator, no Strategy).
 // =============================================================================
 using System;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Windows.Media;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.Gui.Chart;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.Gui.Tools;           // SimpleFont
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
@@ -66,11 +69,9 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.DataLoaded)
             {
-                weeklyVWAP  = A1();
+                weeklyVWAP  = a1(true, true, false, false, false, DateTime.Today, "00:00");
                 atr         = ATR(14);
                 DeltaSeries = new Series<double>(this, MaximumBarsLookBack.Infinite);
-
-                AddChartIndicator(weeklyVWAP);
             }
         }
 
@@ -167,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         // ============================================================
         //  Helper: Delta & Volume boxes under each bar
         // ============================================================
-        private void DrawDeltaVolumeBoxes(int barIdx, int delta, long vol)
+        private void DrawDeltaVolumeBoxes(int barIdx, int delta, double vol)
         {
             Brush backDelta = delta >= 0 ? Brushes.LightGreen : Brushes.LightCoral;
             Brush textBrush = Brushes.Black;
@@ -179,71 +180,71 @@ namespace NinjaTrader.NinjaScript.Indicators
             double yVol   = Low[barIdx] - 4 * TickSize;
 
             var dTxt = Draw.Text(this, dTag, delta.ToString(), Time[barIdx], yDelta, textBrush);
-            dTxt.TextFont = new SharpDX.DirectWrite.TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12);
-            dTxt.BackBrush = backDelta;
+            dTxt.Font = new SimpleFont("Arial", 12);
+            dTxt.AreaBrush = backDelta;
             dTxt.OutlineStroke = new Stroke(Brushes.Black, 1);
 
             var vTxt = Draw.Text(this, vTag, vol.ToString(), Time[barIdx], yVol, textBrush);
-            vTxt.TextFont = new SharpDX.DirectWrite.TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12);
-            vTxt.BackBrush = Brushes.White;
+            vTxt.Font = new SimpleFont("Arial", 12);
+            vTxt.AreaBrush = Brushes.White;
             vTxt.OutlineStroke = new Stroke(Brushes.Black, 1);
         }
     }
 }
-#endregion
+
 #region NinjaScript generated code. Neither change nor remove.
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
-        public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
-        {
-                private MNQ_VWAP_Bands_OF_a12[] cacheMNQ_VWAP_Bands_OF_a12;
-                public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
+	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+	{
+		private MNQ_VWAP_Bands_OF_a12[] cacheMNQ_VWAP_Bands_OF_a12;
+		public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
 
-                public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input, int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        if (cacheMNQ_VWAP_Bands_OF_a12 != null)
-                                for (int idx = 0; idx < cacheMNQ_VWAP_Bands_OF_a12.Length; idx++)
-                                        if (cacheMNQ_VWAP_Bands_OF_a12[idx] != null && cacheMNQ_VWAP_Bands_OF_a12[idx].DeltaThreshold == deltaThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ImbalanceThreshold == imbalanceThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRebote == aTRmultRebote && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRuptura == aTRmultRuptura && cacheMNQ_VWAP_Bands_OF_a12[idx].EqualsInput(input))
-                                                return cacheMNQ_VWAP_Bands_OF_a12[idx];
-                        return CacheIndicator<MNQ_VWAP_Bands_OF_a12>(new MNQ_VWAP_Bands_OF_a12(){ DeltaThreshold = deltaThreshold, ImbalanceThreshold = imbalanceThreshold, ATRmultRebote = aTRmultRebote, ATRmultRuptura = aTRmultRuptura }, input, ref cacheMNQ_VWAP_Bands_OF_a12);
-                }
-        }
+		public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input, int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			if (cacheMNQ_VWAP_Bands_OF_a12 != null)
+				for (int idx = 0; idx < cacheMNQ_VWAP_Bands_OF_a12.Length; idx++)
+					if (cacheMNQ_VWAP_Bands_OF_a12[idx] != null && cacheMNQ_VWAP_Bands_OF_a12[idx].DeltaThreshold == deltaThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ImbalanceThreshold == imbalanceThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRebote == aTRmultRebote && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRuptura == aTRmultRuptura && cacheMNQ_VWAP_Bands_OF_a12[idx].EqualsInput(input))
+						return cacheMNQ_VWAP_Bands_OF_a12[idx];
+			return CacheIndicator<MNQ_VWAP_Bands_OF_a12>(new MNQ_VWAP_Bands_OF_a12(){ DeltaThreshold = deltaThreshold, ImbalanceThreshold = imbalanceThreshold, ATRmultRebote = aTRmultRebote, ATRmultRuptura = aTRmultRuptura }, input, ref cacheMNQ_VWAP_Bands_OF_a12);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
-        public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
-        {
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
+	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+	{
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
 
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
-        }
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-        public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
-        {
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
+	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+	{
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
 
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
-        }
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
+	}
 }
 
 #endregion
