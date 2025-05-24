@@ -191,59 +191,60 @@ namespace NinjaTrader.NinjaScript.Indicators
         }
     }
 }
+
 #region NinjaScript generated code. Neither change nor remove.
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
-        public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
-        {
-                private MNQ_VWAP_Bands_OF_a12[] cacheMNQ_VWAP_Bands_OF_a12;
-                public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
+	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+	{
+		private MNQ_VWAP_Bands_OF_a12[] cacheMNQ_VWAP_Bands_OF_a12;
+		public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
 
-                public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input, int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        if (cacheMNQ_VWAP_Bands_OF_a12 != null)
-                                for (int idx = 0; idx < cacheMNQ_VWAP_Bands_OF_a12.Length; idx++)
-                                        if (cacheMNQ_VWAP_Bands_OF_a12[idx] != null && cacheMNQ_VWAP_Bands_OF_a12[idx].DeltaThreshold == deltaThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ImbalanceThreshold == imbalanceThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRebote == aTRmultRebote && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRuptura == aTRmultRuptura && cacheMNQ_VWAP_Bands_OF_a12[idx].EqualsInput(input))
-                                                return cacheMNQ_VWAP_Bands_OF_a12[idx];
-                        return CacheIndicator<MNQ_VWAP_Bands_OF_a12>(new MNQ_VWAP_Bands_OF_a12(){ DeltaThreshold = deltaThreshold, ImbalanceThreshold = imbalanceThreshold, ATRmultRebote = aTRmultRebote, ATRmultRuptura = aTRmultRuptura }, input, ref cacheMNQ_VWAP_Bands_OF_a12);
-                }
-        }
+		public MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input, int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			if (cacheMNQ_VWAP_Bands_OF_a12 != null)
+				for (int idx = 0; idx < cacheMNQ_VWAP_Bands_OF_a12.Length; idx++)
+					if (cacheMNQ_VWAP_Bands_OF_a12[idx] != null && cacheMNQ_VWAP_Bands_OF_a12[idx].DeltaThreshold == deltaThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ImbalanceThreshold == imbalanceThreshold && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRebote == aTRmultRebote && cacheMNQ_VWAP_Bands_OF_a12[idx].ATRmultRuptura == aTRmultRuptura && cacheMNQ_VWAP_Bands_OF_a12[idx].EqualsInput(input))
+						return cacheMNQ_VWAP_Bands_OF_a12[idx];
+			return CacheIndicator<MNQ_VWAP_Bands_OF_a12>(new MNQ_VWAP_Bands_OF_a12(){ DeltaThreshold = deltaThreshold, ImbalanceThreshold = imbalanceThreshold, ATRmultRebote = aTRmultRebote, ATRmultRuptura = aTRmultRuptura }, input, ref cacheMNQ_VWAP_Bands_OF_a12);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
-        public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
-        {
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
+	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+	{
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
 
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
-        }
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
+	}
 }
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-        public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
-        {
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
+	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+	{
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(Input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
 
-                public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
-                {
-                        return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
-                }
-        }
+		public Indicators.MNQ_VWAP_Bands_OF_a12 MNQ_VWAP_Bands_OF_a12(ISeries<double> input , int deltaThreshold, int imbalanceThreshold, double aTRmultRebote, double aTRmultRuptura)
+		{
+			return indicator.MNQ_VWAP_Bands_OF_a12(input, deltaThreshold, imbalanceThreshold, aTRmultRebote, aTRmultRuptura);
+		}
+	}
 }
 
 #endregion
