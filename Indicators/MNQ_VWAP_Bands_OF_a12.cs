@@ -16,6 +16,7 @@ using NinjaTrader.Gui.Chart;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.Gui.Tools;
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
@@ -40,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         #endregion
 
         #region === PRIVATE FIELDS ===
-        private A1 weeklyVWAP;
+        private a1 weeklyVWAP;
         private ATR atr;
 
         //  Tick‑rule delta accumulator & series
@@ -66,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.DataLoaded)
             {
-                weeklyVWAP  = A1();
+                weeklyVWAP  = a1();
                 atr         = ATR(14);
                 DeltaSeries = new Series<double>(this, MaximumBarsLookBack.Infinite);
 
@@ -108,9 +109,9 @@ namespace NinjaTrader.NinjaScript.Indicators
             deltaBar = 0.0;        // reset for next bar
 
             // VWAP bands
-            double vwap   = weeklyVWAP.VWAP[0];
-            double upper1 = weeklyVWAP.Upper1[0];
-            double lower1 = weeklyVWAP.Lower1[0];
+            double vwap   = weeklyVWAP.Values[0][0];
+            double upper1 = weeklyVWAP.Values[1][0];
+            double lower1 = weeklyVWAP.Values[2][0];
 
             double barRange = High[0] - Low[0];
             double atrVal   = atr[0];
@@ -167,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         // ============================================================
         //  Helper: Delta & Volume boxes under each bar
         // ============================================================
-        private void DrawDeltaVolumeBoxes(int barIdx, int delta, long vol)
+        private void DrawDeltaVolumeBoxes(int barIdx, int delta, double vol)
         {
             Brush backDelta = delta >= 0 ? Brushes.LightGreen : Brushes.LightCoral;
             Brush textBrush = Brushes.Black;
@@ -178,15 +179,13 @@ namespace NinjaTrader.NinjaScript.Indicators
             double yDelta = Low[barIdx] - 2 * TickSize;
             double yVol   = Low[barIdx] - 4 * TickSize;
 
-            var dTxt = Draw.Text(this, dTag, delta.ToString(), Time[barIdx], yDelta, textBrush);
-            dTxt.TextFont = new SharpDX.DirectWrite.TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12);
-            dTxt.BackBrush = backDelta;
-            dTxt.OutlineStroke = new Stroke(Brushes.Black, 1);
+            var dTxt = Draw.Text(this, dTag, false, delta.ToString(), 0, yDelta, 0,
+                textBrush, new SimpleFont("Arial", 12), TextAlignment.Center,
+                Brushes.Black, backDelta, 100);
 
-            var vTxt = Draw.Text(this, vTag, vol.ToString(), Time[barIdx], yVol, textBrush);
-            vTxt.TextFont = new SharpDX.DirectWrite.TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12);
-            vTxt.BackBrush = Brushes.White;
-            vTxt.OutlineStroke = new Stroke(Brushes.Black, 1);
+            var vTxt = Draw.Text(this, vTag, false, vol.ToString(), 0, yVol, 0,
+                textBrush, new SimpleFont("Arial", 12), TextAlignment.Center,
+                Brushes.Black, Brushes.White, 100);
         }
     }
 }
