@@ -19,7 +19,6 @@ namespace NinjaTrader.NinjaScript.Indicators
         private a1 vwap;
         private ATR atr;
         private Series<bool> touchedSeries;
-        private Series<bool> preAtrSeries;
         private Series<bool> atrSeries;
 
         [NinjaScriptProperty]
@@ -43,13 +42,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Configure)
             {
-                vwap = a1(true, true, false, false, false, DateTime.Today, "00:00");
+                vwap = a1(true, true, false, false, false, false, false, DateTime.Today, "00:00");
                 atr  = ATR(ATRPeriod);
             }
             else if (State == State.DataLoaded)
             {
                 touchedSeries = new Series<bool>(this);
-                preAtrSeries  = new Series<bool>(this);
                 atrSeries     = new Series<bool>(this);
             }
         }
@@ -62,7 +60,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (IsFirstTickOfBar)
             {
                 touchedSeries[0] = false;
-                preAtrSeries[0] = false;
                 atrSeries[0]    = false;
             }
 
@@ -98,8 +95,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             double barRange = High[0] - Low[0];
             double atrVal   = atr[0];
 
-            if (barRange >= 0.7 * atrVal)
-                preAtrSeries[0] = true;
             if (barRange >= ATRmultiplier * atrVal)
                 atrSeries[0] = true;
         }
@@ -115,7 +110,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             int lastBar  = ChartBars.ToIndex;
             float barWidth = (float)chartControl.GetBarPaintWidth(ChartBars);
 
-            const float boxHeight = 12f;
+            const float boxHeight = 18f;
             float offset = 5f;
 
             using (var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 10))
@@ -129,11 +124,10 @@ namespace NinjaTrader.NinjaScript.Indicators
                     float xLeft   = xCenter - barWidth / 2f;
                     float xLabel  = xLeft - LabelWidth;
                     float baseY   = (float)chartScale.GetYByValue(Highs[BarsInProgress].GetValueAt(i));
-                    float yTop    = baseY - offset - boxHeight * 3;
+                    float yTop    = baseY - offset - boxHeight * 2;
 
                     DrawBoxWithLabel(touchedSeries.GetValueAt(i), "vwap toco", xLeft, xLabel, yTop, barWidth, boxHeight, fmt, textBrush, fillBrush, borderBrush);
-                    DrawBoxWithLabel(preAtrSeries.GetValueAt(i), "preATRmultiplier", xLeft, xLabel, yTop + boxHeight, barWidth, boxHeight, fmt, textBrush, fillBrush, borderBrush);
-                    DrawBoxWithLabel(atrSeries.GetValueAt(i), "ATRmultiplier", xLeft, xLabel, yTop + 2 * boxHeight, barWidth, boxHeight, fmt, textBrush, fillBrush, borderBrush);
+                    DrawBoxWithLabel(touchedSeries.GetValueAt(i) && atrSeries.GetValueAt(i), "ATRmultiplier", xLeft, xLabel, yTop + boxHeight, barWidth, boxHeight, fmt, textBrush, fillBrush, borderBrush);
                 }
             }
         }
