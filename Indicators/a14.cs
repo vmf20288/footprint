@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Configure)
             {
-                vwap = a1(true, true, false, false, false, DateTime.Today, "00:00");
+                vwap = a1(true, true, false, false, false, false, false, DateTime.Today, "00:00");
                 atr  = ATR(ATRPeriod);
             }
             else if (State == State.DataLoaded)
