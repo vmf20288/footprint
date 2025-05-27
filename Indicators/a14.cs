@@ -17,7 +17,15 @@ namespace NinjaTrader.NinjaScript.Indicators
         private const int  ATRPeriod  = 14;
         private const float LabelWidth = 90f;
 
+
         // ─── PARAMETERS ─────────────────────────────────────────────────
+
+        private a1 vwap;
+        private ATR atr;
+        private Series<bool> touchedSeries;
+        private Series<bool> atrSeries;
+
+
         [NinjaScriptProperty]
         [Display(Name="ATRmultiplier", Order=0, GroupName="Parameters")]
         public double ATRmultiplier { get; set; } = 0.65;
@@ -79,12 +87,17 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Configure)
             {
+
                 vwap = a1(
                     ShowWeeklyCentral, ShowWeeklyBand1, ShowWeeklyBand2,
                     ShowSessionCentral, ShowSessionBand1, ShowSessionBand2,
                     ShowAnchored, AnchorDate, AnchorTime);
 
                 atr = ATR(ATRPeriod);
+
+                vwap = a1(true, true, false, false, false, false, false, DateTime.Today, "00:00");
+                atr  = ATR(ATRPeriod);
+
             }
             else if (State == State.DataLoaded)
             {
@@ -104,6 +117,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 touchedSeries[0] = false;
                 atrSeries[0]     = false;
                 plotHit[0]       = -1;
+                atrSeries[0]    = false;
             }
 
             // — Detección de toque intrabar —
@@ -143,7 +157,13 @@ namespace NinjaTrader.NinjaScript.Indicators
             // — Rangos ATR —
             double barRange = High[0] - Low[0];
             double atrVal   = atr[0];
+
             if (barRange >= ATRmultiplier * atrVal) atrSeries[0] = true;
+
+
+            if (barRange >= ATRmultiplier * atrVal)
+                atrSeries[0] = true;
+
         }
 
         // ─── OnRender ─────────────────────────────────────────────────
@@ -160,6 +180,14 @@ namespace NinjaTrader.NinjaScript.Indicators
             using (var txt = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, Color.Black))
             using (var fill= new SharpDX.Direct2D1.SolidColorBrush(RenderTarget,new Color(0.8f,0.8f,0.8f,1f)))
             using (var brd = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, Color.Black))
+            const float boxHeight = 18f;
+            float offset = 5f;
+
+            using (var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 10))
+            using (var textBrush = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, Color.Black))
+            using (var fillBrush = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, new Color(0.8f, 0.8f, 0.8f, 1f)))
+            using (var borderBrush = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, Color.Black))
+>>>>>>> main
             {
                 for (int i = first; i <= last; i++)
                 {
@@ -172,6 +200,14 @@ namespace NinjaTrader.NinjaScript.Indicators
 
                     DrawBox("vwap touch" + extra, touchedSeries.GetValueAt(i), xL, xLbl, y0, bw, h, fmt, txt, fill, brd);
                     DrawBox("ATRmultiplier", touchedSeries.GetValueAt(i) && atrSeries.GetValueAt(i), xL, xLbl, y0 + h, bw, h, fmt, txt, fill, brd);
+                    float xCenter = chartControl.GetXByBarIndex(ChartBars, i);
+                    float xLeft   = xCenter - barWidth / 2f;
+                    float xLabel  = xLeft - LabelWidth;
+                    float baseY   = (float)chartScale.GetYByValue(Highs[BarsInProgress].GetValueAt(i));
+                    float yTop    = baseY - offset - boxHeight * 2;
+
+                    DrawBoxWithLabel(touchedSeries.GetValueAt(i), "vwap toco", xLeft, xLabel, yTop, barWidth, boxHeight, fmt, textBrush, fillBrush, borderBrush);
+                    DrawBoxWithLabel(touchedSeries.GetValueAt(i) && atrSeries.GetValueAt(i), "ATRmultiplier", xLeft, xLabel, yTop + boxHeight, barWidth, boxHeight, fmt, textBrush, fillBrush, borderBrush);
                 }
             }
         }
