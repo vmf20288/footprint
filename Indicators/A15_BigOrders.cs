@@ -1,23 +1,32 @@
 // -----------------------------------------------------------------------------
-//  A15_BigOrders.cs   (NinjaTrader 8.1 indicator)
+//  A15_BigOrders.cs   – NinjaTrader 8.1 indicator (MNQ‑optimised)
 // -----------------------------------------------------------------------------
-//  Detects “big prints” ≥ QtyMinOrder (default 20 NQ ≈ 200 MNQ) and draws:
-//    • A grey box with the volume above the candle high
-//    • A grey box at the exact trade price
-//  Text colour:  red (Ask) /  lime (Bid)
-//  Exposes Series<int> BigSignal   (1 = Ask big‑print,  ‑1 = Bid big‑print)
-//  Future phase‑2 will extend to iceberg detection.
+//  v2   2025‑06‑01
+//  • Big‑print detection  (≥ QtyMinOrder, clustering 0.5 s)
+//  • Iceberg detection    (Executed ≥ 3×MaxVisible  &  ≥ 150 MNQ  within 30 s)
+//  • NEW:  clusters draw with **gold border**  to distinguish from single ticks
+//  • Graphic: two grey rectangles per signal
+//       – top‑of‑candle  (context overview)
+//       – at trade price (exact level)
+//       – text colour red/lime per side
+//       – gold stroke when event was a *cluster*
 // -----------------------------------------------------------------------------
-
+//  Public Series
+//       BigSignal  :  +1 big‑print ask   |  ‑1 big‑print bid
+//                      +2 iceberg ask    |  ‑2 iceberg bid
+//       BigPrice   :  price of last signal
+//       BigVolume  :  volume of last signal
+//       HiddenSize :  iceberg hidden portion (0 for big‑prints)
+// -----------------------------------------------------------------------------
 #region Using declarations
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Windows.Media;
 
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
@@ -27,83 +36,173 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
     public class A15_BigOrders : Indicator
     {
-        // -----------------------------------------------------------  Parameters
-        [Display(Name = "Qty Min Order (NQ)", GroupName = "Parameters", Order = 0)]
+        // -----------------------------  user parameter (editable)
+        [Display(Name = "Qty Min Order (MNQ)", GroupName = "Parameters", Order = 0)]
         [Range(1, int.MaxValue)]
-        public int QtyMinOrder { get; set; } = 20;          // default 20 NQ
+        public int QtyMinOrder { get; set; } = 200; // default 200 MNQ (≈20 NQ)
 
-        // Public series so other indicators / strategies can read
-        [Browsable(false)] public Series<int> BigSignal { get; private set; }
+        // -----------------------------  fixed constants (MNQ‑tuned)
+        private const int    KeepBars        = 120;
+        private const int    CleanInterval   = 20;
+        private const double ClusterWindowMs = 500;
+        private const int    MinVisibleQty   = 50;
+        private const int    IcebergFactor   = 3;
+        private const int    IcebergMinExec  = 150;
+        private const int    IceWindowSec    = 30;
 
-        // -----------------------------------------------------------  State
+        // -----------------------------  public output series
+        [Browsable(false)] public Series<int>    BigSignal   { get; private set; }
+        [Browsable(false)] public Series<double> BigPrice    { get; private set; }
+        [Browsable(false)] public Series<int>    BigVolume   { get; private set; }
+        [Browsable(false)] public Series<int>    HiddenSize  { get; private set; }
+
+        // -----------------------------  internal structs
+        private class Cluster
+        {
+            public DateTime FirstTime;
+            public int      Volume;
+            public bool     IsAsk;
+        }
+        private class IceTrack
+        {
+            public DateTime Start;
+            public int      Executed;
+            public int      MaxVisible;
+            public bool     IsAsk;
+        }
+
+        private readonly Dictionary<double, Cluster>  clusters = new();
+        private readonly Dictionary<double, IceTrack> ice      = new();
+
+        // -----------------------------  State
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name                    = "A15_BigOrders";
-                Description             = "Detects big prints (>= QtyMinOrder) and marks them.";
-                Calculate               = Calculate.OnEachTick;   // need tick granularity
-                IsOverlay               = true;                   // draw over price panel
-                DisplayInDataBox        = false;
+                Name             = "A15_BigOrders";
+                Description      = "Big prints + iceberg detector (MNQ)";
+                Calculate        = Calculate.OnEachTick;
+                IsOverlay        = true;
+                DisplayInDataBox = false;
             }
             else if (State == State.DataLoaded)
             {
-                BigSignal = new Series<int>(this);
+                BigSignal  = new Series<int>(this);
+                BigPrice   = new Series<double>(this);
+                BigVolume  = new Series<int>(this);
+                HiddenSize = new Series<int>(this);
             }
         }
 
-        // -----------------------------------------------------------  Tick handler
+        // -----------------------------  Tick handler (phase‑1  + clustering)
         protected override void OnMarketData(MarketDataEventArgs e)
         {
-            if (e.MarketDataType != MarketDataType.Last) return;  // only prints
-            if (e.Volume < QtyMinOrder)          return;          // not big enough
+            if (e.MarketDataType != MarketDataType.Last) return;
 
-            // Determine aggressor side (rough) via best bid/ask at that moment
-            double bid = GetCurrentBid();
-            double ask = GetCurrentAsk();
-            bool   isAskAggressor = e.Price >= ask - TickSize * 0.5;   // in ask column
+            bool isAsk = e.Price >= GetCurrentAsk() - TickSize * 0.5;
+            double key  = e.Price;
 
-            Brush txtClr  = isAskAggressor ? Brushes.Red  : Brushes.Lime;
-            int   signal  = isAskAggressor ? 1 : -1;
+            // create / update cluster
+            if (!clusters.ContainsKey(key) ||
+                (e.Time - clusters[key].FirstTime).TotalMilliseconds > ClusterWindowMs)
+            {
+                clusters[key] = new Cluster { FirstTime = e.Time, Volume = (int)e.Volume, IsAsk = isAsk };
+            }
+            else
+            {
+                clusters[key].Volume += (int)e.Volume;
+            }
 
-            // Candle index that contains this tick
-            int barsAgo = Bars.GetBar(e.Time);
-            if (barsAgo < 0) return;   // tick older than loaded data
+            // big‑print (single or clustered)
+            if (clusters[key].Volume >= QtyMinOrder)
+            {
+                bool isCluster = (e.Time - clusters[key].FirstTime).TotalMilliseconds > 1; // >1 ms means grouped
+                DrawBig(clusters[key].FirstTime, key, clusters[key].Volume, clusters[key].IsAsk, 1, isCluster);
+                clusters.Remove(key);
+            }
+        }
 
-            // ---------------- draw grey box above candle high
-            double yPlot = High[barsAgo] + (TickSize * 2);
-            string tagHi = $"BO_H_{CurrentBar}_{e.Time.Ticks}";
+        // -----------------------------  Depth handler (phase‑2  iceberg)
+        protected override void OnMarketDepth(MarketDepthEventArgs e)
+        {
+            if (e.Operation == Operation.Remove || e.MarketDataType == MarketDataType.Last) return;
 
-            Draw.Rectangle(this, tagHi, false, barsAgo, yPlot + TickSize,
-                                            barsAgo, yPlot - TickSize,
-                                            Brushes.DimGray, Brushes.DimGray, 50);
-            Draw.Text(this, tagHi + "_txt",
-            Draw.Text(this, tagHi + "_txt", false,
-                      e.Volume.ToString(), barsAgo, yPlot, txtClr);
+            bool isAsk  = e.MarketDataType == MarketDataType.Ask;
+            double price = e.Price;
+            int visible  = (int)e.Volume;
 
-            // ---------------- draw grey box at trade price level
-            string tagPx = $"BO_P_{CurrentBar}_{e.Time.Ticks}";
-            Draw.Rectangle(this, tagPx, false, barsAgo, e.Price + TickSize/2,
-                                            barsAgo, e.Price - TickSize/2,
-                                            Brushes.DimGray, Brushes.DimGray, 50);
-            Draw.Text(this, tagPx + "_txt",
-            Draw.Text(this, tagPx + "_txt", false,
-                      e.Volume.ToString(), barsAgo, e.Price, txtClr);
+            if (visible >= MinVisibleQty && !ice.ContainsKey(price))
+            {
+                ice[price] = new IceTrack { Start = Time[0], MaxVisible = visible, Executed = 0, IsAsk = isAsk };
+            }
+            else if (ice.ContainsKey(price))
+            {
+                var t = ice[price];
+                if (visible > t.MaxVisible) t.MaxVisible = visible;           // replenishment / stacking
+                if ((Time[0] - t.Start).TotalSeconds > IceWindowSec) ice.Remove(price);
+            }
+        }
 
-            // ---------------- expose signal for other scripts
-            BigSignal[0] = signal;
+        // called from DrawBig to accumulate executed volume on price
+        private void UpdateIceExecuted(double price, int volume, bool isAsk)
+        {
+            if (!ice.ContainsKey(price)) return;
+            var t = ice[price];
+            if (t.IsAsk != isAsk) return;
 
-            // ---------------- housekeeping: purge very old tags (keep last 400 bars)
-            if (CurrentBar > 400)
+            t.Executed += volume;
+            if (t.Executed >= IcebergMinExec && t.Executed >= IcebergFactor * t.MaxVisible)
+            {
+                DrawBig(Time[0], price, t.Executed, isAsk, 2, false, t.Executed - t.MaxVisible);
+                ice.Remove(price);
+            }
+        }
+
+        // -----------------------------  Draw helper
+        private void DrawBig(DateTime firstTick, double price, int vol, bool isAsk, int kind, bool isCluster = false, int hidden = 0)
+        {
+            int barsAgo = Bars.GetBar(firstTick);
+            if (barsAgo < 0) return;
+
+            Brush txtClr   = isAsk ? Brushes.Red : Brushes.Lime;
+            Brush boxBrush = Brushes.DimGray;
+            Brush stroke   = isCluster && kind == 1 ? Brushes.Gold : Brushes.DimGray; // gold border for clusters
+
+            string prefix = kind == 1 ? "BP" : "IC";
+            string tagHi  = $"{prefix}H_{CurrentBar}_{firstTick.Ticks}";
+            string tagPx  = $"{prefix}P_{CurrentBar}_{firstTick.Ticks}";
+
+            double yHigh = High[barsAgo] + TickSize * 2;
+            Draw.Rectangle(this, tagHi, false, barsAgo, yHigh + TickSize, barsAgo, yHigh - TickSize,
+                           stroke, boxBrush, 50);
+            Draw.Text(this, tagHi + "_t", vol.ToString(), barsAgo, yHigh, txtClr);
+
+            Draw.Rectangle(this, tagPx, false, barsAgo, price + TickSize/2, barsAgo, price - TickSize/2,
+                           stroke, boxBrush, 50);
+            string txt = kind == 2 ? ($"{vol}\n❄ {hidden}") : vol.ToString();
+            Draw.Text(this, tagPx + "_t", txt, barsAgo, price, txtClr);
+
+            // expose series
+            BigSignal[0]  = isAsk ? kind : -kind;
+            BigPrice[0]   = price;
+            BigVolume[0]  = vol;
+            HiddenSize[0] = hidden;
+
+            // feed iceberg tracker
+            UpdateIceExecuted(price, vol, isAsk);
+
+            // periodic cleanup
+            if (CurrentBar > KeepBars && CurrentBar % CleanInterval == 0)
                 RemoveDrawObjects();
         }
 
-        // -----------------------------------------------------------  Helper for other scripts
-        public bool IsBigPrintUp   => BigSignal[0] ==  1;   // ask side
-        public bool IsBigPrintDown => BigSignal[0] == -1;   // bid side
+        // -----------------------------  helper bools (optional)
+        public bool IsBigPrintUp   => BigSignal[0] ==  1;
+        public bool IsBigPrintDown => BigSignal[0] == -1;
+        public bool IsIceUp        => BigSignal[0] ==  2;
+        public bool IsIceDown      => BigSignal[0] == -2;
     }
 }
-
 
 #region NinjaScript generated code. Neither change nor remove.
 
