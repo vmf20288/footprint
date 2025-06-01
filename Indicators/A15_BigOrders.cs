@@ -106,6 +106,11 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!clusters.ContainsKey(key) ||
                 (e.Time - clusters[key].FirstTime).TotalMilliseconds > ClusterWindowMs)
             {
+                clusters[key] = new Cluster { FirstTime = e.Time, Volume = (int)e.Volume, IsAsk = isAsk };
+            }
+            else
+            {
+                clusters[key].Volume += (int)e.Volume;
                 clusters[key] = new Cluster { FirstTime = e.Time, Volume = e.Volume, IsAsk = isAsk };
             }
             else
@@ -175,11 +180,13 @@ namespace NinjaTrader.NinjaScript.Indicators
             double yHigh = High[barsAgo] + TickSize * 2;
             Draw.Rectangle(this, tagHi, false, barsAgo, yHigh + TickSize, barsAgo, yHigh - TickSize,
                            stroke, boxBrush, 50);
+            Draw.Text(this, tagHi + "_t", vol.ToString(), barsAgo, yHigh, txtClr);
             Draw.Text(this, tagHi + "_t", false, vol.ToString(), barsAgo, yHigh, txtClr);
 
             Draw.Rectangle(this, tagPx, false, barsAgo, price + TickSize/2, barsAgo, price - TickSize/2,
                            stroke, boxBrush, 50);
             string txt = kind == 2 ? ($"{vol}\n❄ {hidden}") : vol.ToString();
+            Draw.Text(this, tagPx + "_t", txt, barsAgo, price, txtClr);
             Draw.Text(this, tagPx + "_t", false, txt, barsAgo, price, txtClr);
 
             // expose series
