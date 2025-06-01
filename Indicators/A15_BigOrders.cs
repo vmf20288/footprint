@@ -78,6 +78,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                                             barsAgo, yPlot - TickSize,
                                             Brushes.DimGray, Brushes.DimGray, 50);
             Draw.Text(this, tagHi + "_txt",
+            Draw.Text(this, tagHi + "_txt", false,
                       e.Volume.ToString(), barsAgo, yPlot, txtClr);
 
             // ---------------- draw grey box at trade price level
@@ -86,6 +87,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                                             barsAgo, e.Price - TickSize/2,
                                             Brushes.DimGray, Brushes.DimGray, 50);
             Draw.Text(this, tagPx + "_txt",
+            Draw.Text(this, tagPx + "_txt", false,
                       e.Volume.ToString(), barsAgo, e.Price, txtClr);
 
             // ---------------- expose signal for other scripts
