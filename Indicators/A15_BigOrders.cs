@@ -74,6 +74,31 @@ namespace NinjaTrader.NinjaScript.Indicators
         private readonly Dictionary<double, Cluster>  clusters = new();
         private readonly Dictionary<double, IceTrack> ice      = new();
 
+
+        // -----------------------------  public output series
+        [Browsable(false)] public Series<int>    BigSignal   { get; private set; }
+        [Browsable(false)] public Series<double> BigPrice    { get; private set; }
+        [Browsable(false)] public Series<int>    BigVolume   { get; private set; }
+        [Browsable(false)] public Series<int>    HiddenSize  { get; private set; }
+
+        // -----------------------------  internal structs
+        private class Cluster
+        {
+            public DateTime FirstTime;
+            public int      Volume;
+            public bool     IsAsk;
+        }
+        private class IceTrack
+        {
+            public DateTime Start;
+            public int      Executed;
+            public int      MaxVisible;
+            public bool     IsAsk;
+        }
+
+        private readonly Dictionary<double, Cluster>  clusters = new();
+        private readonly Dictionary<double, IceTrack> ice      = new();
+
         // -----------------------------  State
         protected override void OnStateChange()
         {
@@ -111,6 +136,11 @@ namespace NinjaTrader.NinjaScript.Indicators
             else
             {
                 clusters[key].Volume += (int)e.Volume;
+                clusters[key] = new Cluster { FirstTime = e.Time, Volume = e.Volume, IsAsk = isAsk };
+            }
+            else
+            {
+                clusters[key].Volume += e.Volume;
             }
 
             // big‑print (single or clustered)
@@ -176,11 +206,13 @@ namespace NinjaTrader.NinjaScript.Indicators
             Draw.Rectangle(this, tagHi, false, barsAgo, yHigh + TickSize, barsAgo, yHigh - TickSize,
                            stroke, boxBrush, 50);
             Draw.Text(this, tagHi + "_t", vol.ToString(), barsAgo, yHigh, txtClr);
+            Draw.Text(this, tagHi + "_t", false, vol.ToString(), barsAgo, yHigh, txtClr);
 
             Draw.Rectangle(this, tagPx, false, barsAgo, price + TickSize/2, barsAgo, price - TickSize/2,
                            stroke, boxBrush, 50);
             string txt = kind == 2 ? ($"{vol}\n❄ {hidden}") : vol.ToString();
             Draw.Text(this, tagPx + "_t", txt, barsAgo, price, txtClr);
+            Draw.Text(this, tagPx + "_t", false, txt, barsAgo, price, txtClr);
 
             // expose series
             BigSignal[0]  = isAsk ? kind : -kind;
