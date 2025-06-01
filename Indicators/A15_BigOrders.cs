@@ -77,6 +77,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             Draw.Rectangle(this, tagHi, false, barsAgo, yPlot + TickSize,
                                             barsAgo, yPlot - TickSize,
                                             Brushes.DimGray, Brushes.DimGray, 50);
+            Draw.Text(this, tagHi + "_txt",
             Draw.Text(this, tagHi + "_txt", false,
                       e.Volume.ToString(), barsAgo, yPlot, txtClr);
 
@@ -85,6 +86,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             Draw.Rectangle(this, tagPx, false, barsAgo, e.Price + TickSize/2,
                                             barsAgo, e.Price - TickSize/2,
                                             Brushes.DimGray, Brushes.DimGray, 50);
+            Draw.Text(this, tagPx + "_txt",
             Draw.Text(this, tagPx + "_txt", false,
                       e.Volume.ToString(), barsAgo, e.Price, txtClr);
 
