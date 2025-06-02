@@ -171,6 +171,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         // ----------------------  Dibujo principal ----------------------------
         private void DrawEvent(DateTime tickTime, double price, long vol, bool isAsk, int kind, bool clusterBorder)
         {
+            int barsAgo = CurrentBar - Bars.GetBar(tickTime);
             int barsAgo = Bars.GetBar(tickTime);
             if (barsAgo < 0) return;
 
@@ -182,6 +183,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             if(kind==1 && clusterBorder) { if(isAsk) clAsk += vol; else clBid += vol; }
 
+            // Dibujar número sobre la vela en negro y centrado
+            string lbl = vol.ToString();
+            var font = new SimpleFont("Arial", 12) { Bold = true };
+            Draw.Text(this, $"EV_{CurrentBar}_{price}_{Environment.TickCount}", false, lbl,
+                barsAgo, price, 0, Brushes.Black, font, TextAlignment.Center,
+                Brushes.Transparent, Brushes.Transparent, 0);
             // Dibujar número sobre la vela
             string lbl = vol.ToString();
             Brush txtClr = isAsk ? Brushes.Red : Brushes.Lime;
@@ -210,6 +217,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             const float offY = 10f;
             const float offX = 60f;
             const float boxW = 60f;
+            const float boxH = 22f;
+
+            using var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12f);
+            using var brushBid = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Lime);
+            using var brushAsk = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Red);
+            using var brushLabel = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Black);
             const float boxH = 16f;
 
             using var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 9f);
