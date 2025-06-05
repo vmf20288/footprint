@@ -65,6 +65,12 @@ namespace NinjaTrader.NinjaScript.Indicators
         private long clBid, clAsk;    // cluster
         private long icBid, icAsk;    // iceberg
 
+
+        // ----------------------  Acumuladores por vela -----------------------
+        private long bpBid, bpAsk;    // big-print
+        private long clBid, clAsk;    // cluster
+        private long icBid, icAsk;    // iceberg
+
         // ----------------------  Estructuras internas ------------------------
         private class ClusterInfo
         {
@@ -172,6 +178,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         // ----------------------  Dibujo principal ----------------------------
         private void DrawEvent(DateTime tickTime, double price, long vol, bool isAsk, int kind, bool clusterBorder)
         {
+            int barsAgo = CurrentBar - Bars.GetBar(tickTime);
             int barsAgo = Bars.GetBar(tickTime);
             if (barsAgo < 0) return;
 
@@ -189,6 +196,16 @@ namespace NinjaTrader.NinjaScript.Indicators
             Draw.Text(this, $"EV_{CurrentBar}_{price}_{Environment.TickCount}", false,
                 lbl, barsAgo, price, 0, Brushes.Black, font,
                 System.Windows.TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
+            // Dibujar número sobre la vela en negro y centrado
+            string lbl = vol.ToString();
+            var font = new SimpleFont("Arial", 12) { Bold = true };
+            Draw.Text(this, $"EV_{CurrentBar}_{price}_{Environment.TickCount}", false, lbl,
+                barsAgo, price, 0, Brushes.Black, font, TextAlignment.Center,
+                Brushes.Transparent, Brushes.Transparent, 0);
+            // Dibujar número sobre la vela
+            string lbl = vol.ToString();
+            Brush txtClr = isAsk ? Brushes.Red : Brushes.Lime;
+            Draw.Text(this, $"EV_{CurrentBar}_{price}_{Environment.TickCount}", lbl, barsAgo, price, txtClr);
 
             // Mandar señal a series
             BigSignal[0] = isAsk ? kind : -kind;
@@ -219,6 +236,18 @@ namespace NinjaTrader.NinjaScript.Indicators
             using var brushBid = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Lime);
             using var brushAsk = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Red);
             using var brushLabel = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Black);
+            const float boxH = 22f;
+
+            using var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12f);
+            using var brushBid = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Lime);
+            using var brushAsk = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Red);
+            using var brushLabel = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Black);
+            const float boxH = 16f;
+
+            using var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 9f);
+            using var brushBid = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Lime);
+            using var brushAsk = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Red);
+            using var brushLabel = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.WhiteSmoke);
             using var fillBrush = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.DimGray);
             using var borderBrush = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Black);
 
