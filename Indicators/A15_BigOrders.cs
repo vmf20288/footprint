@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Windows.Media;
+using System.Windows;
 
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
@@ -58,6 +59,12 @@ namespace NinjaTrader.NinjaScript.Indicators
         [Browsable(false)] public Series<double> BigPrice  { get; private set; }
         [Browsable(false)] public Series<int>    BigVolume { get; private set; }
         [Browsable(false)] public Series<int>    HiddenSize{ get; private set; }
+
+        // ----------------------  Acumuladores por vela -----------------------
+        private long bpBid, bpAsk;    // big-print
+        private long clBid, clAsk;    // cluster
+        private long icBid, icAsk;    // iceberg
+
 
         // ----------------------  Acumuladores por vela -----------------------
         private long bpBid, bpAsk;    // big-print
@@ -183,6 +190,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             if(kind==1 && clusterBorder) { if(isAsk) clAsk += vol; else clBid += vol; }
 
+            // Dibujar número sobre la vela en negro y fuente grande
+            string lbl = vol.ToString();
+            var font = new SimpleFont("Arial", 12);
+            Draw.Text(this, $"EV_{CurrentBar}_{price}_{Environment.TickCount}", false,
+                lbl, barsAgo, price, 0, Brushes.Black, font,
+                System.Windows.TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
             // Dibujar número sobre la vela en negro y centrado
             string lbl = vol.ToString();
             var font = new SimpleFont("Arial", 12) { Bold = true };
@@ -217,6 +230,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             const float offY = 10f;
             const float offX = 60f;
             const float boxW = 60f;
+            const float boxH = 20f;
+
+            using var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 11f);
+            using var brushBid = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Lime);
+            using var brushAsk = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Red);
+            using var brushLabel = new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Black);
             const float boxH = 22f;
 
             using var fmt = new TextFormat(Core.Globals.DirectWriteFactory, "Arial", 12f);
